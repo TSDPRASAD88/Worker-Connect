@@ -1,6 +1,8 @@
 import { useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
+import "../styles/auth.css";
+import "../styles/global.css";
 
 const RegisterPage = () => {
   const [form, setForm] = useState({
@@ -23,31 +25,40 @@ const RegisterPage = () => {
     });
   };
 
-  // 📍 Get real GPS location
   const getLocation = () => {
-  setLoadingLocation(true);
+    setLoadingLocation(true);
 
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
 
-      setLocation({
-        type: "Point",
-        coordinates: [lng, lat],
-      });
+        setLocation({
+          type: "Point",
+          coordinates: [lng, lat],
+        });
 
-      setLoadingLocation(false);
-    },
-    (err) => {
-      console.error(err);
+        setLoadingLocation(false);
+      },
+      (err) => {
+        console.error("GPS failed:", err);
 
-      alert("Location access denied");
+        setLocation({
+          type: "Point",
+          coordinates: [83.2185, 17.6868],
+        });
 
-      setLoadingLocation(false); // 🔥 IMPORTANT FIX
-    }
-  );
-};
+        alert("GPS failed. Using Vizag location.");
+
+        setLoadingLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  };
 
   const handleRegister = async () => {
     try {
@@ -63,79 +74,76 @@ const RegisterPage = () => {
       });
 
       alert("Registered successfully");
-
       navigate("/login");
     } catch (err) {
-      console.error(err);
-      alert("Registration failed");
+       console.error(err.response?.data || err.message);
+  alert(err.response?.data?.message || "Registration failed");
     }
   };
 
   return (
-    <div style={{ padding: "20px", maxWidth: "400px", margin: "auto" }}>
-      <h2>Worker Register</h2>
+    <div className="container">
+      <div className="auth-card">
+        <h2 className="auth-title">Worker Register</h2>
 
-      <input
-        name="name"
-        placeholder="Name"
-        onChange={handleChange}
-        style={{ display: "block", marginBottom: "10px", width: "100%" }}
-      />
+        <input
+          className="auth-input"
+          name="name"
+          placeholder="Name"
+          onChange={handleChange}
+        />
 
-      <input
-        name="email"
-        placeholder="Email"
-        onChange={handleChange}
-        style={{ display: "block", marginBottom: "10px", width: "100%" }}
-      />
+        <input
+          className="auth-input"
+          name="email"
+          placeholder="Email"
+          onChange={handleChange}
+        />
 
-      <input
-        name="password"
-        placeholder="Password"
-        type="password"
-        onChange={handleChange}
-        style={{ display: "block", marginBottom: "10px", width: "100%" }}
-      />
+        <input
+          className="auth-input"
+          name="password"
+          type="password"
+          placeholder="Password"
+          onChange={handleChange}
+        />
 
-      <input
-        name="phone"
-        placeholder="Phone"
-        onChange={handleChange}
-        style={{ display: "block", marginBottom: "10px", width: "100%" }}
-      />
+        <input
+          className="auth-input"
+          name="phone"
+          placeholder="Phone"
+          onChange={handleChange}
+        />
 
-      {/* 🔧 Skill Selection */}
-      <select
-        value={skill}
-        onChange={(e) => setSkill(e.target.value)}
-        style={{ display: "block", marginBottom: "10px", width: "100%" }}
-      >
-        <option value="plumber">Plumber</option>
-        <option value="electrician">Electrician</option>
-        <option value="painter">Painter</option>
-        <option value="carpenter">Carpenter</option>
-      </select>
+        <select
+          className="auth-input"
+          value={skill}
+          onChange={(e) => setSkill(e.target.value)}
+        >
+          <option value="plumber">Plumber</option>
+          <option value="electrician">Electrician</option>
+          <option value="painter">Painter</option>
+          <option value="carpenter">Carpenter</option>
+        </select>
 
-      {/* 📍 Location Button */}
-      <button
-        onClick={getLocation}
-        style={{ marginBottom: "10px", width: "100%" }}
-      >
-        {loadingLocation ? "Getting location..." : "Get Location"}
-      </button>
+        <button className="auth-button" onClick={getLocation}>
+          {loadingLocation ? "Getting location..." : "Get Location"}
+        </button>
 
-      {location && (
-        <p style={{ fontSize: "12px", color: "green" }}>
-          Location captured ✅
+        {location && (
+          <p style={{ fontSize: "12px", color: "lightgreen" }}>
+            Location captured ✅
+          </p>
+        )}
+
+        <button className="auth-button" onClick={handleRegister}>
+          Register
+        </button>
+
+        <p className="auth-link" onClick={() => navigate("/login")}>
+          Already have an account? Login
         </p>
-      )}
-
-      <button
-        onClick={handleRegister}
-        style={{ width: "100%" }}
-      >
-        Register
-      </button>
+      </div>
     </div>
   );
 };

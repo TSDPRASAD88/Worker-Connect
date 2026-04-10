@@ -1,0 +1,33 @@
+.dashboard-title {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.job-card {
+  background: #1e293b;
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 15px;
+}
+
+.job-status {
+  font-size: 14px;
+  margin: 5px 0;
+}
+
+.accept-btn {
+  background: #3b82f6;
+  margin-right: 10px;
+}
+
+.complete-btn {
+  background: #22c55e;
+}
+
+.job-btn {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+}

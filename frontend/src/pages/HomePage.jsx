@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
+import "../styles/home.css";
+import "../styles/global.css";
+
 
 const HomePage = () => {
   const [workers, setWorkers] = useState([]);
@@ -34,18 +37,24 @@ const HomePage = () => {
   };
 
   return (
-    <div>
-      <h2>Nearby Workers</h2>
+    
+  <div className="container">
+  <h2 className="title">Nearby Workers</h2>
 
       {workers.map((w) => (
-        <div key={w._id}>
-          <h3>{w.name}</h3>
-          <p>{w.skills.join(", ")}</p>
-          <button onClick={() => bookWorker(w._id)}>
-            Book
-          </button>
-        </div>
-      ))}
+    <div className="worker-card" key={w._id}>
+      <p className="worker-name">{w.name}</p>
+      <p className="worker-skill">{w.skills[0]}</p>
+
+      {w.distance && (
+        <p className="worker-distance">
+          {(w.distance / 1000).toFixed(2)} km away
+        </p>
+      )}
+
+      <button className="book-btn">Book</button>
+    </div>
+  ))}
     </div>
   );
 };
