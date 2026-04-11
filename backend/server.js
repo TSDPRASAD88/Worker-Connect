@@ -3,7 +3,8 @@ import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import http from "http";
 import { Server } from "socket.io";
-import jwt from "jsonwebtoken"; // 🔥 YOU FORGOT THIS
+import jwt from "jsonwebtoken";
+import { setIO } from "./sockets/socketInstance.js";
 
 dotenv.config();
 connectDB();
@@ -12,29 +13,27 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: process.env.CLIENT_URL || "*",
+    methods: ["GET", "POST"],
   },
 });
 
-// export io (used in routes)
-export { io };
+// Export io via the shared instance module (avoids circular imports)
+setIO(io);
 
 io.on("connection", (socket) => {
   try {
     const token = socket.handshake.auth.token;
 
-    console.log("Incoming token:", token);
-
     if (!token) {
-      console.log("❌ No token, disconnecting...");
+      console.log("❌ No token on socket, disconnecting");
       return socket.disconnect();
     }
 
-    // 🔥 VERIFY TOKEN
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Support both raw token and "Bearer <token>"
+    const cleanToken = token.startsWith("Bearer ") ? token.slice(7) : token;
 
-    console.log("✅ Decoded token:", decoded);
-
+    const decoded = jwt.verify(cleanToken, process.env.JWT_SECRET);
     const workerId = decoded.id;
 
     if (!workerId) {
@@ -42,9 +41,7 @@ io.on("connection", (socket) => {
       return socket.disconnect();
     }
 
-    // 🔥 JOIN ROOM
-    socket.join(workerId);
-
+    socket.join(workerId.toString());
     console.log(`🟢 Worker ${workerId} connected and joined room`);
 
     socket.on("disconnect", () => {
@@ -52,7 +49,7 @@ io.on("connection", (socket) => {
     });
 
   } catch (error) {
-    console.log("❌ JWT ERROR:", error.message);
+    console.log("❌ Socket JWT error:", error.message);
     socket.disconnect();
   }
 });

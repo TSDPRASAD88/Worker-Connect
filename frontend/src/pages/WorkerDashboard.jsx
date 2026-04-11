@@ -1,98 +1,221 @@
 import { useEffect, useState } from "react";
-import { connectSocket } from "../hooks/useSocket";
+import { useNavigate } from "react-router-dom";
+import { connectSocket, disconnectSocket } from "../hooks/useSocket";
 import API from "../services/api";
-import "../styles/dashboard.css";
 import "../styles/global.css";
+import "../styles/dashboard.css";
+
+const SERVICE_ICONS = {
+  plumber: "🔧",
+  electrician: "⚡",
+  painter: "🎨",
+  carpenter: "🪚",
+  general: "🛠️",
+};
+
+const formatTime = (dateStr) => {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+};
 
 const WorkerDashboard = () => {
   const [bookings, setBookings] = useState([]);
+  const [connected, setConnected] = useState(false);
+  const [loadingId, setLoadingId] = useState(null);
+  const [toast, setToast] = useState({ show: false, msg: "", type: "" });
+  const navigate = useNavigate();
 
+  const workerId = localStorage.getItem("workerId");
+
+  const showToast = (msg, type = "success") => {
+    setToast({ show: true, msg, type });
+    setTimeout(() => setToast({ show: false, msg: "", type: "" }), 3000);
+  };
+
+  // Load existing bookings for this worker on mount
   useEffect(() => {
-    const socket = connectSocket();
-
-    if (!socket) return;
-
-    socket.on("connect", () => {
-      console.log("🟢 CONNECTED:", socket.id);
-    });
-
-    socket.on("connect_error", (err) => {
-      console.log("🔴 CONNECT ERROR:", err.message);
-    });
-
-    socket.on("new-booking", (data) => {
-      setBookings((prev) => [...prev, data]);
-    });
-
-    socket.on("disconnect", () => {
-      console.log("❌ Socket disconnected");
-    });
-
-    return () => {};
+    if (!workerId) {
+      navigate("/login");
+      return;
+    }
+    loadBookings();
   }, []);
 
-  const acceptBooking = async (id) => {
+  const loadBookings = async () => {
     try {
-      await API.put(`/bookings/${id}`, {
-        status: "accepted",
-      });
-
-      setBookings((prev) =>
-        prev.map((b) =>
-          b._id === id ? { ...b, status: "accepted" } : b
-        )
-      );
+      const res = await API.get(`/bookings/worker/${workerId}`);
+      setBookings(res.data);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load bookings:", err);
     }
   };
 
-  const completeBooking = async (id) => {
-    try {
-      await API.put(`/bookings/${id}`, {
-        status: "completed",
-      });
-
-      setBookings((prev) =>
-        prev.map((b) =>
-          b._id === id ? { ...b, status: "completed" } : b
-        )
-      );
-    } catch (err) {
-      console.error(err);
+  // Socket connection
+  useEffect(() => {
+    const socket = connectSocket();
+    if (!socket) {
+      navigate("/login");
+      return;
     }
+
+    socket.on("connect", () => setConnected(true));
+    socket.on("disconnect", () => setConnected(false));
+    socket.on("connect_error", () => setConnected(false));
+
+    socket.on("new-booking", (data) => {
+      setBookings((prev) => {
+        // Deduplicate: ignore if booking with same _id already exists
+        if (prev.some((b) => b._id === data._id)) return prev;
+        return [data, ...prev];
+      });
+      showToast("🔔 New job request received!", "success");
+    });
+
+    return () => {
+      socket.off("connect");
+      socket.off("disconnect");
+      socket.off("connect_error");
+      socket.off("new-booking");
+    };
+  }, []);
+
+  const updateBooking = async (id, status) => {
+    setLoadingId(id);
+    try {
+      await API.put(`/bookings/${id}`, { status });
+      setBookings((prev) =>
+        prev.map((b) => (b._id === id ? { ...b, status } : b))
+      );
+      showToast(status === "accepted" ? "Job accepted!" : "Job marked complete ✅");
+    } catch (err) {
+      showToast(err.response?.data?.message || "Update failed", "error");
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const handleLogout = () => {
+    disconnectSocket();
+    localStorage.removeItem("token");
+    localStorage.removeItem("workerId");
+    navigate("/login");
+  };
+
+  const stats = {
+    total: bookings.length,
+    pending: bookings.filter((b) => b.status === "pending").length,
+    completed: bookings.filter((b) => b.status === "completed").length,
   };
 
   return (
-    <div className="container">
-      <h2 className="dashboard-title">Incoming Jobs</h2>
-
-      {bookings.length === 0 && <p>No jobs yet</p>}
-
-      {bookings.map((b) => (
-        <div className="job-card" key={b._id}>
-          <p><strong>{b.serviceType}</strong></p>
-          <p className="job-status">Status: {b.status}</p>
-
-          {b.status === "pending" && (
-            <button
-              className="job-btn accept-btn"
-              onClick={() => acceptBooking(b._id)}
-            >
-              Accept
+    <div className="dashboard-page">
+      {/* Navbar */}
+      <nav className="navbar">
+        <div className="navbar__inner">
+          <span className="navbar__brand">Vizag<span>Connect</span></span>
+          <div className="navbar__actions">
+            <div className={`conn-status ${connected ? "conn-status--connected" : "conn-status--disconnected"}`}>
+              <span className="conn-dot" />
+              {connected ? "Online" : "Offline"}
+            </div>
+            <button className="btn btn--ghost btn--sm" onClick={handleLogout}>
+              Logout
             </button>
-          )}
-
-          {b.status === "accepted" && (
-            <button
-              className="job-btn complete-btn"
-              onClick={() => completeBooking(b._id)}
-            >
-              Complete
-            </button>
-          )}
+          </div>
         </div>
-      ))}
+      </nav>
+
+      {/* Stats */}
+      <div className="stats-bar">
+        <div className="stats-bar__inner">
+          <div className="stat-item">
+            <div className="stat-value stat-value--brand">{stats.total}</div>
+            <div className="stat-label">Total Jobs</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-value">{stats.pending}</div>
+            <div className="stat-label">Pending</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-value stat-value--success">{stats.completed}</div>
+            <div className="stat-label">Completed</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Jobs */}
+      <div className="jobs-section">
+        <div className="jobs-header">
+          <h2 className="jobs-title">Incoming Jobs</h2>
+          <div className="live-badge">
+            <span className="live-dot" />
+            Live
+          </div>
+        </div>
+
+        {bookings.length === 0 ? (
+          <div className="empty-state">
+            <span className="empty-state__icon">📭</span>
+            <p className="empty-state__text">No jobs yet. Stay online to receive requests!</p>
+          </div>
+        ) : (
+          bookings.map((b) => (
+            <div
+              key={b._id}
+              className={`job-card job-card--${b.status}`}
+            >
+              <div className="job-card__header">
+                <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                  <div className="job-icon">
+                    {SERVICE_ICONS[b.serviceType] || "🛠️"}
+                  </div>
+                  <div>
+                    <div className="job-service">{b.serviceType}</div>
+                    <div className="job-meta">{formatTime(b.createdAt)}</div>
+                  </div>
+                </div>
+                <span className={`badge badge--${b.status}`}>
+                  {b.status}
+                </span>
+              </div>
+
+              <div className="job-actions">
+                {b.status === "pending" && (
+                  <button
+                    className="job-btn job-btn--accept"
+                    onClick={() => updateBooking(b._id, "accepted")}
+                    disabled={loadingId === b._id}
+                  >
+                    {loadingId === b._id ? <span className="spinner" /> : "✓"}
+                    {loadingId === b._id ? "Accepting..." : "Accept Job"}
+                  </button>
+                )}
+                {b.status === "accepted" && (
+                  <button
+                    className="job-btn job-btn--complete"
+                    onClick={() => updateBooking(b._id, "completed")}
+                    disabled={loadingId === b._id}
+                  >
+                    {loadingId === b._id ? <span className="spinner" /> : "✓"}
+                    {loadingId === b._id ? "Completing..." : "Mark Complete"}
+                  </button>
+                )}
+                {b.status === "completed" && (
+                  <span style={{ fontSize: "13px", color: "var(--success)", fontWeight: 500 }}>
+                    ✅ Job completed
+                  </span>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Toast */}
+      <div className={`toast toast--${toast.type} ${toast.show ? "show" : ""}`}>
+        {toast.msg}
+      </div>
     </div>
   );
 };

@@ -10,9 +10,13 @@ router.post("/register", async (req, res) => {
   try {
     const { name, email, password, phone, skills, location } = req.body;
 
+    if (!name || !email || !password || !phone || !location) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
     const existing = await Worker.findOne({ email });
     if (existing) {
-      return res.status(400).json({ message: "Worker already exists" });
+      return res.status(400).json({ message: "An account with this email already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -26,7 +30,7 @@ router.post("/register", async (req, res) => {
       location,
     });
 
-    res.json({
+    res.status(201).json({
       message: "Registered successfully",
       workerId: worker._id,
     });
@@ -40,17 +44,20 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
     const worker = await Worker.findOne({ email });
     if (!worker) {
-      return res.status(404).json({ message: "Worker not found" });
+      return res.status(404).json({ message: "No account found with this email" });
     }
 
     const isMatch = await bcrypt.compare(password, worker.password);
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid password" });
+      return res.status(400).json({ message: "Incorrect password" });
     }
 
-    // 🔥 CREATE TOKEN
     const token = jwt.sign(
       { id: worker._id },
       process.env.JWT_SECRET,
@@ -66,4 +73,5 @@ router.post("/login", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 export default router;
