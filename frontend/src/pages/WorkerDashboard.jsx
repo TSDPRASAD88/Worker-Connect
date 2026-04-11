@@ -1,23 +1,17 @@
 import { useEffect, useState } from "react";
 import { connectSocket } from "../hooks/useSocket";
 import API from "../services/api";
+import "../styles/dashboard.css";
+import "../styles/global.css";
 
 const WorkerDashboard = () => {
   const [bookings, setBookings] = useState([]);
 
   useEffect(() => {
-    console.log("🔥 WorkerDashboard mounted");
-
     const socket = connectSocket();
 
-    if (!socket) {
-      console.log("❌ No socket created (token missing)");
-      return;
-    }
+    if (!socket) return;
 
-    console.log("✅ Socket object created");
-
-    // 🔥 VERY IMPORTANT
     socket.on("connect", () => {
       console.log("🟢 CONNECTED:", socket.id);
     });
@@ -27,7 +21,6 @@ const WorkerDashboard = () => {
     });
 
     socket.on("new-booking", (data) => {
-      console.log("📩 New booking received:", data);
       setBookings((prev) => [...prev, data]);
     });
 
@@ -35,9 +28,7 @@ const WorkerDashboard = () => {
       console.log("❌ Socket disconnected");
     });
 
-    return () => {
-      console.log("🧹 Cleanup skipped (dev mode)");
-    };
+    return () => {};
   }, []);
 
   const acceptBooking = async (id) => {
@@ -51,8 +42,6 @@ const WorkerDashboard = () => {
           b._id === id ? { ...b, status: "accepted" } : b
         )
       );
-
-      alert("Booking accepted");
     } catch (err) {
       console.error(err);
     }
@@ -69,39 +58,36 @@ const WorkerDashboard = () => {
           b._id === id ? { ...b, status: "completed" } : b
         )
       );
-
-      alert("Booking completed");
     } catch (err) {
       console.error(err);
     }
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>Incoming Jobs</h2>
+    <div className="container">
+      <h2 className="dashboard-title">Incoming Jobs</h2>
 
       {bookings.length === 0 && <p>No jobs yet</p>}
 
       {bookings.map((b) => (
-        <div
-          key={b._id}
-          style={{
-            border: "1px solid #ccc",
-            padding: "10px",
-            marginBottom: "10px",
-          }}
-        >
-          <p><strong>Service:</strong> {b.serviceType}</p>
-          <p><strong>Status:</strong> {b.status}</p>
+        <div className="job-card" key={b._id}>
+          <p><strong>{b.serviceType}</strong></p>
+          <p className="job-status">Status: {b.status}</p>
 
           {b.status === "pending" && (
-            <button onClick={() => acceptBooking(b._id)}>
+            <button
+              className="job-btn accept-btn"
+              onClick={() => acceptBooking(b._id)}
+            >
               Accept
             </button>
           )}
 
           {b.status === "accepted" && (
-            <button onClick={() => completeBooking(b._id)}>
+            <button
+              className="job-btn complete-btn"
+              onClick={() => completeBooking(b._id)}
+            >
               Complete
             </button>
           )}

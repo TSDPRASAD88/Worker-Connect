@@ -26,19 +26,22 @@ router.get("/nearby", async (req, res) => {
   try {
     const { lat, lng } = req.query;
 
-    const workers = await Worker.find({
-        availability: true,
-      location: {
-        $near: {
-          $geometry: {
+    const workers = await Worker.aggregate([
+      {
+        $geoNear: {
+          near: {
             type: "Point",
             coordinates: [parseFloat(lng), parseFloat(lat)],
           },
-          $maxDistance: 5000, // 5km radius
+          distanceField: "distance",
+          spherical: true,
+          maxDistance: 5000,
         },
       },
-    });
-    
+      {
+        $match: { availability: true },
+      },
+    ]);
 
     res.json(workers);
   } catch (error) {
