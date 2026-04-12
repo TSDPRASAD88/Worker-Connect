@@ -4,7 +4,7 @@ import protect from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Get all workers (public)
+// GET ALL WORKERS (public — no password)
 router.get("/", async (req, res) => {
   try {
     const workers = await Worker.find().select("-password");
@@ -14,16 +14,16 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Nearby workers (public — used by homepage)
+// GET NEARBY WORKERS — supports area text search + geo distance filter
 router.get("/nearby", async (req, res) => {
   try {
-    const { lat, lng } = req.query;
+    const { lat, lng, area, skill } = req.query;
 
     if (!lat || !lng) {
-      return res.status(400).json({ message: "lat and lng query params are required" });
+      return res.status(400).json({ message: "lat and lng are required" });
     }
 
-    const workers = await Worker.aggregate([
+    const geoStages = [
       {
         $geoNear: {
           near: {
@@ -32,24 +32,37 @@ router.get("/nearby", async (req, res) => {
           },
           distanceField: "distance",
           spherical: true,
-          maxDistance: 5000, // 5km radius
+          maxDistance: 10000, // 10km
         },
       },
-      {
-        $match: { availability: true },
-      },
-      {
-        $project: { password: 0 }, // Never expose password
-      },
-    ]);
+    ];
 
+    const matchConditions = { availability: true };
+
+    // Area text filter (case-insensitive partial match)
+    if (area && area.trim() !== "") {
+      matchConditions.area = { $regex: area.trim(), $options: "i" };
+    }
+
+    // Skill filter
+    if (skill && skill !== "all") {
+      matchConditions.skills = skill;
+    }
+
+    const pipeline = [
+      ...geoStages,
+      { $match: matchConditions },
+      { $project: { password: 0 } },
+    ];
+
+    const workers = await Worker.aggregate(pipeline);
     res.json(workers);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-// Get single worker (protected)
+// GET SINGLE WORKER (protected)
 router.get("/:id", protect, async (req, res) => {
   try {
     const worker = await Worker.findById(req.params.id).select("-password");
