@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:8080";
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:8080" || "https://worker-connect-id09.onrender.com";
 
 // Authenticated socket — used by workers (has JWT token)
 let workerSocket = null;
