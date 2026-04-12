@@ -17,14 +17,18 @@ const LoginPage = () => {
     setLoading(true);
     try {
       const res = await API.post("/auth/login", { email, password });
+
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("workerId", res.data.workerId);
-      localStorage.setItem("isAdmin", res.data.isAdmin ? "true" : "false");
 
-      // Admin goes to admin dashboard, workers go to their dashboard
+      // Only set "isAdmin" to "true" if the server confirmed it —
+      // otherwise remove it entirely so a stale "false" string
+      // never leaks between sessions.
       if (res.data.isAdmin) {
+        localStorage.setItem("isAdmin", "true");
         navigate("/admin");
       } else {
+        localStorage.removeItem("isAdmin");
         navigate("/worker");
       }
     } catch (err) {

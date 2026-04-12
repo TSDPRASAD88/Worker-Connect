@@ -4,7 +4,8 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 const router = express.Router();
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@vizagconnect.com";
+// const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@vizagconnect.com";
+const ADMIN_EMAIL = "prasadthamarana2006@gmail.com";
 
 // REGISTER
 router.post("/register", async (req, res) => {

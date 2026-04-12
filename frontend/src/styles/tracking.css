@@ -1,0 +1,205 @@
+.tracking-page {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+/* Top bar */
+.tracking-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 60px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 1000;   /* above Leaflet tiles (z-index 400) */
+  position: relative;
+}
+
+.tracking-back {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.tracking-back:hover { background: var(--surface-3); }
+
+.tracking-bar__center { flex: 1; min-width: 0; }
+
+.tracking-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+}
+
+.tracking-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* Connection pill */
+.conn-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.conn-pill--on  { background: var(--success-bg); color: var(--success); }
+.conn-pill--off { background: var(--danger-bg);  color: var(--danger); }
+.conn-pill__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 2s infinite;
+}
+
+/* Map fills all remaining space */
+.tracking-map {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  z-index: 0;
+}
+
+/* Leaflet attribution sits at bottom-right — keep it visible */
+.tracking-map .leaflet-control-attribution {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+/* Leaflet zoom controls — nudge them down so they don't overlap the top bar */
+.tracking-map .leaflet-top.leaflet-left {
+  top: 10px;
+}
+
+.tracking-map__loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 14px;
+  z-index: 10;
+}
+
+/* Bottom panel */
+.tracking-panel {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 16px 20px 20px;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+  z-index: 1000;
+  position: relative;
+}
+
+.tracking-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1.5px currentColor;
+}
+.legend-dot--worker { background: #FF5C00; color: #FF5C00; }
+.legend-dot--user   { background: #3B82F6; color: #3B82F6; }
+
+.legend-status {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.legend-status--live {
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* Distance between both */
+.tracking-distance {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 10px 14px;
+  background: var(--brand-bg);
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+}
+.tracking-distance__value {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--brand);
+}
+.tracking-distance__label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Call worker button */
+.tracking-call-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px;
+  background: var(--success);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.18s;
+}
+.tracking-call-btn:hover {
+  background: #00a06b;
+  box-shadow: 0 4px 14px rgba(0,184,122,0.3);
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
+import { connectUserSocket, disconnectUserSocket } from "../hooks/useSocket";
 import "../styles/global.css";
 import "../styles/home.css";
 
@@ -43,7 +44,15 @@ const HomePage = () => {
   const [bookingId, setBookingId] = useState(null);
   const [toast, setToast] = useState({ show: false, msg: "", type: "" });
   const [userCoords, setUserCoords] = useState({ lat: 17.7, lng: 83.3 });
+  // Track accepted bookings so user can open tracking page
+  const [acceptedBookings, setAcceptedBookings] = useState([]);
   const navigate = useNavigate();
+
+  const userId = localStorage.getItem("userId") || (() => {
+    const id = "guest-" + Date.now();
+    localStorage.setItem("userId", id);
+    return id;
+  })();
 
   const debouncedArea = useDebounce(areaSearch, 500);
 
@@ -56,9 +65,27 @@ const HomePage = () => {
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {} // keep default Vizag coords
+      () => {}
     );
   }, []);
+
+  // Connect user socket to receive booking-accepted events
+  useEffect(() => {
+    const socket = connectUserSocket(userId);
+    if (!socket) return;
+
+    socket.on("booking-accepted", ({ bookingId: bId, workerName }) => {
+      setAcceptedBookings((prev) => {
+        if (prev.some((b) => b.bookingId === bId)) return prev;
+        return [...prev, { bookingId: bId, workerName }];
+      });
+      showToast(`✅ ${workerName} accepted your booking!`, "success");
+    });
+
+    return () => {
+      socket.off("booking-accepted");
+    };
+  }, [userId]);
 
   // Fetch workers whenever coords, area, or skill filter changes
   useEffect(() => {
@@ -118,6 +145,39 @@ const HomePage = () => {
           </div>
         </div>
       </nav>
+
+      {/* Accepted booking banners */}
+      {acceptedBookings.map((b) => (
+        <div key={b.bookingId} style={{
+          background: "var(--success)",
+          color: "white",
+          padding: "12px 20px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "12px",
+          flexWrap: "wrap",
+        }}>
+          <span style={{ fontSize: "14px", fontWeight: 500 }}>
+            🟢 <strong>{b.workerName}</strong> accepted your booking!
+          </span>
+          <button
+            onClick={() => navigate(`/track/${b.bookingId}`)}
+            style={{
+              background: "white",
+              color: "var(--success)",
+              border: "none",
+              borderRadius: "6px",
+              padding: "7px 16px",
+              fontWeight: 700,
+              fontSize: "13px",
+              cursor: "pointer",
+            }}
+          >
+            📍 Track Live
+          </button>
+        </div>
+      ))}
 
       {/* Hero */}
       <section className="hero-section">
@@ -210,9 +270,12 @@ const HomePage = () => {
                   </div>
 
                   <div className="worker-name">{w.name}</div>
-                  {w.area && (
-                    <div className="worker-area">📍 {w.area}</div>
-                  )}
+
+                  {/* Always render area row — placeholder keeps card height equal */}
+                  {w.area
+                    ? <div className="worker-area">📍 {w.area}</div>
+                    : <div className="worker-area-placeholder" />
+                  }
 
                   <div className="worker-skills">
                     <span className="skill-tag">
@@ -221,8 +284,9 @@ const HomePage = () => {
                   </div>
 
                   <div className="worker-meta">
+                    {/* Always show exact km — no "Nearby" fallback */}
                     <span className="worker-distance">
-                      {w.distance ? `${(w.distance / 1000).toFixed(1)} km away` : "Nearby"}
+                      📍 {(w.distance / 1000).toFixed(1)} km away
                     </span>
                     {w.rating > 0 && (
                       <span className="worker-rating">⭐ {w.rating.toFixed(1)}</span>

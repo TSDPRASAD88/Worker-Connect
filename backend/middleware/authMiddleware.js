@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@vizagconnect.com";
+// Hardcoded as fallback — .env value is trimmed to avoid whitespace issues
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "prasadthamarana2006@gmail.com").trim();
 
 const protect = (req, res, next) => {
   try {
@@ -31,7 +32,7 @@ export const adminOnly = (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (decoded.email !== ADMIN_EMAIL) {
+    if (decoded.email?.trim() !== ADMIN_EMAIL) {
       return res.status(403).json({ message: "Admin access only" });
     }
 
