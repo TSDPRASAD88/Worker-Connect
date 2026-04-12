@@ -5,6 +5,7 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import PaymentPage from "./pages/PaymentPage";
 import AdminDashboard from "./pages/AdminDashboard";
+import TrackingPage from "./pages/TrackingPage";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/register"            element={<RegisterPage />} />
         <Route path="/payment/:bookingId"  element={<PaymentPage />} />
         <Route path="/admin"               element={<AdminDashboard />} />
+        <Route path="/track/:bookingId"    element={<TrackingPage />} />
       </Routes>
     </BrowserRouter>
   );

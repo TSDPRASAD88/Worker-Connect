@@ -109,6 +109,18 @@ router.put("/:id", protect, async (req, res) => {
       }
       worker.availability = false;
       await worker.save();
+
+      // Notify the user's socket room that their booking was accepted
+      try {
+        const io = getIO();
+        io.to(`user-${booking.userId}`).emit("booking-accepted", {
+          bookingId: booking._id,
+          workerName: worker.name,
+          workerPhone: worker.phone,
+        });
+      } catch (e) {
+        console.warn("booking-accepted emit failed (non-fatal):", e.message);
+      }
     }
 
     if (status === "completed") {

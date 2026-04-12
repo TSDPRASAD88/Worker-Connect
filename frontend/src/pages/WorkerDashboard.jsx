@@ -207,13 +207,23 @@ const WorkerDashboard = () => {
                 )}
 
                 {b.status === "accepted" && (
-                  <button
-                    className="job-btn job-btn--complete"
-                    onClick={() => completeBooking(b._id)}
-                    disabled={loadingId === b._id}
-                  >
-                    {loadingId === b._id ? <><span className="spinner" /> Completing...</> : "✓ Mark Complete"}
-                  </button>
+                  <>
+                    <button
+                      className="job-btn job-btn--complete"
+                      onClick={() => completeBooking(b._id)}
+                      disabled={loadingId === b._id}
+                      style={{ flex: 2 }}
+                    >
+                      {loadingId === b._id ? <><span className="spinner" /> Completing...</> : "✓ Mark Complete"}
+                    </button>
+                    <button
+                      className="job-btn"
+                      onClick={() => navigate(`/track/${b._id}`)}
+                      style={{ flex: 1, background: "#3B82F6", color: "white" }}
+                    >
+                      📍 Track
+                    </button>
+                  </>
                 )}
 
                 {b.status === "completed" && (
