@@ -3,15 +3,19 @@ import HomePage from "./pages/HomePage";
 import WorkerDashboard from "./pages/WorkerDashboard";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import PaymentPage from "./pages/PaymentPage";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/worker" element={<WorkerDashboard />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/"                    element={<HomePage />} />
+        <Route path="/worker"              element={<WorkerDashboard />} />
+        <Route path="/login"               element={<LoginPage />} />
+        <Route path="/register"            element={<RegisterPage />} />
+        <Route path="/payment/:bookingId"  element={<PaymentPage />} />
+        <Route path="/admin"               element={<AdminDashboard />} />
       </Routes>
     </BrowserRouter>
   );

@@ -5,15 +5,21 @@ import "../styles/auth.css";
 import "../styles/global.css";
 
 const SKILLS = [
-  { value: "plumber", label: "🔧 Plumber" },
-  { value: "electrician", label: "⚡ Electrician" },
-  { value: "painter", label: "🎨 Painter" },
-  { value: "carpenter", label: "🪚 Carpenter" },
+  { value: "plumber",       label: "🔧 Plumber" },
+  { value: "electrician",   label: "⚡ Electrician" },
+  { value: "painter",       label: "🎨 Painter" },
+  { value: "carpenter",     label: "🪚 Carpenter" },
+  { value: "house cleaning",label: "🧹 House Cleaning" },
+  { value: "construction",  label: "🏗️ Construction" },
+  { value: "labour",        label: "💪 Labour" },
+  { value: "other",         label: "✏️ Other" },
 ];
 
 const RegisterPage = () => {
   const [form, setForm] = useState({ name: "", email: "", password: "", phone: "" });
   const [skill, setSkill] = useState("plumber");
+  const [customSkill, setCustomSkill] = useState("");
+  const [area, setArea] = useState("");
   const [location, setLocation] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -30,7 +36,6 @@ const RegisterPage = () => {
         setLoadingLocation(false);
       },
       () => {
-        // Fallback to Vizag city center
         setLocation({ type: "Point", coordinates: [83.2185, 17.6868] });
         setLoadingLocation(false);
       },
@@ -40,8 +45,12 @@ const RegisterPage = () => {
 
   const handleRegister = async () => {
     const { name, email, password, phone } = form;
-    if (!name || !email || !password || !phone) {
-      setError("Please fill in all fields");
+    if (!name || !email || !password || !phone || !area) {
+      setError("Please fill in all fields including your area");
+      return;
+    }
+    if (skill === "other" && !customSkill.trim()) {
+      setError("Please enter your skill in the Other field");
       return;
     }
     if (!location) {
@@ -51,7 +60,13 @@ const RegisterPage = () => {
     setError("");
     setLoading(true);
     try {
-      await API.post("/auth/register", { ...form, skills: [skill], location });
+      await API.post("/auth/register", {
+        ...form,
+        skills: [skill],
+        customSkill: skill === "other" ? customSkill.trim() : "",
+        area: area.trim(),
+        location,
+      });
       navigate("/login");
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed");
@@ -68,19 +83,7 @@ const RegisterPage = () => {
         <p className="auth-subtitle">Start receiving jobs in your area</p>
         <div className="auth-divider" />
 
-        {error && (
-          <div style={{
-            background: "rgba(239,68,68,0.08)",
-            color: "#B91C1C",
-            padding: "10px 14px",
-            borderRadius: "8px",
-            fontSize: "13px",
-            marginBottom: "14px",
-            fontWeight: 500
-          }}>
-            {error}
-          </div>
-        )}
+        {error && <div className="error-box">{error}</div>}
 
         <div className="form-group">
           <label className="form-label">Full Name</label>
@@ -103,6 +106,16 @@ const RegisterPage = () => {
         </div>
 
         <div className="form-group">
+          <label className="form-label">Your area / neighbourhood</label>
+          <input
+            className="form-input"
+            placeholder="e.g. Gajuwaka, MVP Colony, Rushikonda"
+            value={area}
+            onChange={(e) => setArea(e.target.value)}
+          />
+        </div>
+
+        <div className="form-group">
           <label className="form-label">Your skill</label>
           <div className="skills-grid">
             {SKILLS.map((s) => (
@@ -115,14 +128,21 @@ const RegisterPage = () => {
               </div>
             ))}
           </div>
+          {skill === "other" && (
+            <input
+              className="form-input"
+              placeholder="Enter your skill (e.g. AC Repair, Welder)"
+              value={customSkill}
+              onChange={(e) => setCustomSkill(e.target.value)}
+              style={{ marginTop: "8px" }}
+            />
+          )}
         </div>
 
         <div className="form-group">
           <label className="form-label">Location</label>
           {location ? (
-            <div className="location-status">
-              ✅ Location captured — ready to go
-            </div>
+            <div className="location-status">✅ Location captured — ready to go</div>
           ) : (
             <button
               className="auth-btn auth-btn--secondary"
@@ -130,22 +150,20 @@ const RegisterPage = () => {
               disabled={loadingLocation}
               style={{ marginBottom: "14px" }}
             >
-              {loadingLocation ? <span className="spinner" style={{ borderTopColor: "#0D0D0D" }} /> : "📍"}
-              {loadingLocation ? "Detecting location..." : "Capture My Location"}
+              {loadingLocation
+                ? <><span className="spinner spinner--dark" /> Detecting...</>
+                : "📍 Capture My Location"}
             </button>
           )}
         </div>
 
         <button className="auth-btn" onClick={handleRegister} disabled={loading}>
-          {loading ? <span className="spinner" /> : null}
-          {loading ? "Creating account..." : "Create Account"}
+          {loading ? <><span className="spinner" /> Creating account...</> : "Create Account"}
         </button>
 
         <div className="auth-footer">
           Already registered?{" "}
-          <span className="auth-link" onClick={() => navigate("/login")}>
-            Sign in
-          </span>
+          <span className="auth-link" onClick={() => navigate("/login")}>Sign in</span>
         </div>
       </div>
     </div>

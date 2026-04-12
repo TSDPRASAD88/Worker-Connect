@@ -6,17 +6,19 @@ import "../styles/global.css";
 import "../styles/dashboard.css";
 
 const SERVICE_ICONS = {
-  plumber: "🔧",
-  electrician: "⚡",
-  painter: "🎨",
-  carpenter: "🪚",
-  general: "🛠️",
+  plumber: "🔧", electrician: "⚡", painter: "🎨",
+  carpenter: "🪚", "house cleaning": "🧹",
+  construction: "🏗️", labour: "💪", other: "✏️", general: "🛠️",
 };
 
 const formatTime = (dateStr) => {
   if (!dateStr) return "";
-  const d = new Date(dateStr);
-  return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  return new Date(dateStr).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 };
 
 const WorkerDashboard = () => {
@@ -33,7 +35,7 @@ const WorkerDashboard = () => {
     setTimeout(() => setToast({ show: false, msg: "", type: "" }), 3000);
   };
 
-  // Load existing bookings for this worker on mount
+  // Redirect if not logged in
   useEffect(() => {
     if (!workerId) {
       navigate("/login");
@@ -65,7 +67,6 @@ const WorkerDashboard = () => {
 
     socket.on("new-booking", (data) => {
       setBookings((prev) => {
-        // Deduplicate: ignore if booking with same _id already exists
         if (prev.some((b) => b._id === data._id)) return prev;
         return [data, ...prev];
       });
@@ -80,16 +81,33 @@ const WorkerDashboard = () => {
     };
   }, []);
 
-  const updateBooking = async (id, status) => {
+  const acceptBooking = async (id) => {
     setLoadingId(id);
     try {
-      await API.put(`/bookings/${id}`, { status });
+      await API.put(`/bookings/${id}`, { status: "accepted" });
       setBookings((prev) =>
-        prev.map((b) => (b._id === id ? { ...b, status } : b))
+        prev.map((b) => (b._id === id ? { ...b, status: "accepted" } : b))
       );
-      showToast(status === "accepted" ? "Job accepted!" : "Job marked complete ✅");
+      showToast("Job accepted!");
     } catch (err) {
-      showToast(err.response?.data?.message || "Update failed", "error");
+      showToast(err.response?.data?.message || "Failed to accept", "error");
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const completeBooking = async (id) => {
+    setLoadingId(id);
+    try {
+      await API.put(`/bookings/${id}`, { status: "completed" });
+      setBookings((prev) =>
+        prev.map((b) => (b._id === id ? { ...b, status: "completed" } : b))
+      );
+      showToast("Job completed! Proceeding to payment...");
+      // Navigate to payment page after short delay
+      setTimeout(() => navigate(`/payment/${id}`), 1200);
+    } catch (err) {
+      showToast(err.response?.data?.message || "Failed to complete", "error");
     } finally {
       setLoadingId(null);
     }
@@ -105,7 +123,7 @@ const WorkerDashboard = () => {
   const stats = {
     total: bookings.length,
     pending: bookings.filter((b) => b.status === "pending").length,
-    completed: bookings.filter((b) => b.status === "completed").length,
+    completed: bookings.filter((b) => ["completed", "paid"].includes(b.status)).length,
   };
 
   return (
@@ -144,7 +162,7 @@ const WorkerDashboard = () => {
         </div>
       </div>
 
-      {/* Jobs */}
+      {/* Jobs list */}
       <div className="jobs-section">
         <div className="jobs-header">
           <h2 className="jobs-title">Incoming Jobs</h2>
@@ -161,10 +179,7 @@ const WorkerDashboard = () => {
           </div>
         ) : (
           bookings.map((b) => (
-            <div
-              key={b._id}
-              className={`job-card job-card--${b.status}`}
-            >
+            <div key={b._id} className={`job-card job-card--${b.status}`}>
               <div className="job-card__header">
                 <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                   <div className="job-icon">
@@ -172,38 +187,48 @@ const WorkerDashboard = () => {
                   </div>
                   <div>
                     <div className="job-service">{b.serviceType}</div>
-                    <div className="job-meta">{formatTime(b.createdAt)}</div>
+                    <div className="job-meta">
+                      {formatDate(b.createdAt)} · {formatTime(b.createdAt)}
+                    </div>
                   </div>
                 </div>
-                <span className={`badge badge--${b.status}`}>
-                  {b.status}
-                </span>
+                <span className={`badge badge--${b.status}`}>{b.status}</span>
               </div>
 
               <div className="job-actions">
                 {b.status === "pending" && (
                   <button
                     className="job-btn job-btn--accept"
-                    onClick={() => updateBooking(b._id, "accepted")}
+                    onClick={() => acceptBooking(b._id)}
                     disabled={loadingId === b._id}
                   >
-                    {loadingId === b._id ? <span className="spinner" /> : "✓"}
-                    {loadingId === b._id ? "Accepting..." : "Accept Job"}
+                    {loadingId === b._id ? <><span className="spinner" /> Accepting...</> : "✓ Accept Job"}
                   </button>
                 )}
+
                 {b.status === "accepted" && (
                   <button
                     className="job-btn job-btn--complete"
-                    onClick={() => updateBooking(b._id, "completed")}
+                    onClick={() => completeBooking(b._id)}
                     disabled={loadingId === b._id}
                   >
-                    {loadingId === b._id ? <span className="spinner" /> : "✓"}
-                    {loadingId === b._id ? "Completing..." : "Mark Complete"}
+                    {loadingId === b._id ? <><span className="spinner" /> Completing...</> : "✓ Mark Complete"}
                   </button>
                 )}
+
                 {b.status === "completed" && (
-                  <span style={{ fontSize: "13px", color: "var(--success)", fontWeight: 500 }}>
-                    ✅ Job completed
+                  <button
+                    className="job-btn job-btn--complete"
+                    onClick={() => navigate(`/payment/${b._id}`)}
+                    style={{ background: "#8B5CF6" }}
+                  >
+                    💳 Go to Payment
+                  </button>
+                )}
+
+                {b.status === "paid" && (
+                  <span style={{ fontSize: "13px", color: "#8B5CF6", fontWeight: 600 }}>
+                    ✅ Payment received
                   </span>
                 )}
               </div>
@@ -212,7 +237,6 @@ const WorkerDashboard = () => {
         )}
       </div>
 
-      {/* Toast */}
       <div className={`toast toast--${toast.type} ${toast.show ? "show" : ""}`}>
         {toast.msg}
       </div>
