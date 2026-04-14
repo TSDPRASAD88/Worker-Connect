@@ -1,20 +1,20 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
-import { connectUserSocket, disconnectUserSocket } from "../hooks/useSocket";
+import { connectUserSocket } from "../hooks/useSocket";
 import "../styles/global.css";
 import "../styles/home.css";
 
 const SKILL_FILTERS = [
-  { value: "all",           label: "All" },
-  { value: "plumber",       label: "🔧 Plumber" },
-  { value: "electrician",   label: "⚡ Electrician" },
-  { value: "painter",       label: "🎨 Painter" },
-  { value: "carpenter",     label: "🪚 Carpenter" },
-  { value: "house cleaning",label: "🧹 Cleaning" },
-  { value: "construction",  label: "🏗️ Construction" },
-  { value: "labour",        label: "💪 Labour" },
-  { value: "other",         label: "✏️ Other" },
+  { value: "all",            label: "All" },
+  { value: "plumber",        label: "🔧 Plumber" },
+  { value: "electrician",    label: "⚡ Electrician" },
+  { value: "painter",        label: "🎨 Painter" },
+  { value: "carpenter",      label: "🪚 Carpenter" },
+  { value: "house cleaning", label: "🧹 Cleaning" },
+  { value: "construction",   label: "🏗️ Construction" },
+  { value: "labour",         label: "💪 Labour" },
+  { value: "other",          label: "✏️ Other" },
 ];
 
 const SERVICE_ICONS = {
@@ -23,8 +23,25 @@ const SERVICE_ICONS = {
   construction: "🏗️", labour: "💪", other: "✏️", general: "🛠️",
 };
 
+// Distinct bg colors for avatars based on name
+const AVATAR_COLORS = [
+  ["#FF5C00", "#fff"],
+  ["#3B82F6", "#fff"],
+  ["#10B981", "#fff"],
+  ["#8B5CF6", "#fff"],
+  ["#F59E0B", "#fff"],
+  ["#EF4444", "#fff"],
+  ["#06B6D4", "#fff"],
+  ["#EC4899", "#fff"],
+];
+
 const getInitials = (name) =>
   name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?";
+
+const getAvatarColors = (name) => {
+  const idx = (name?.charCodeAt(0) || 0) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[idx];
+};
 
 // Debounce helper
 const useDebounce = (value, delay) => {
@@ -38,19 +55,20 @@ const useDebounce = (value, delay) => {
 
 const HomePage = () => {
   const [workers, setWorkers] = useState([]);
+  const [allWorkers, setAllWorkers] = useState([]); // ✅ store full list to prevent missing workers
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("all");
   const [areaSearch, setAreaSearch] = useState("");
   const [bookingId, setBookingId] = useState(null);
   const [toast, setToast] = useState({ show: false, msg: "", type: "" });
-  const [userCoords, setUserCoords] = useState({ lat: 17.7, lng: 83.3 });
-  // Track accepted bookings so user can open tracking page
+  const [userCoords, setUserCoords] = useState(null); // ✅ null until GPS resolves
+  const [coordsReady, setCoordsReady] = useState(false);
   const [acceptedBookings, setAcceptedBookings] = useState([]);
   const navigate = useNavigate();
 
-  const userId = localStorage.getItem("userId") || (() => {
-    const id = "guest-" + Date.now();
-    localStorage.setItem("userId", id);
+  const userId = (() => {
+    let id = localStorage.getItem("userId");
+    if (!id) { id = "guest-" + Date.now(); localStorage.setItem("userId", id); }
     return id;
   })();
 
@@ -61,15 +79,23 @@ const HomePage = () => {
     setTimeout(() => setToast({ show: false, msg: "", type: "" }), 3000);
   };
 
-  // Get user GPS once
+  // ✅ Get GPS once — only trigger fetch after coords are ready
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
-      (pos) => setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {}
+      (pos) => {
+        setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setCoordsReady(true);
+      },
+      () => {
+        // GPS denied — fall back to Vizag center
+        setUserCoords({ lat: 17.7, lng: 83.3 });
+        setCoordsReady(true);
+      },
+      { timeout: 6000 }
     );
   }, []);
 
-  // Connect user socket to receive booking-accepted events
+  // Connect socket for booking-accepted events
   useEffect(() => {
     const socket = connectUserSocket(userId);
     if (!socket) return;
@@ -82,28 +108,44 @@ const HomePage = () => {
       showToast(`✅ ${workerName} accepted your booking!`, "success");
     });
 
-    return () => {
-      socket.off("booking-accepted");
-    };
+    return () => { socket.off("booking-accepted"); };
   }, [userId]);
 
-  // Fetch workers whenever coords, area, or skill filter changes
+  // ✅ Only fetch when coords are ready
   useEffect(() => {
+    if (!coordsReady) return;
     fetchWorkers();
-  }, [userCoords, debouncedArea, activeFilter]);
+  }, [coordsReady, debouncedArea, activeFilter]);
+
+  // ✅ Client-side filter from full list to prevent workers disappearing
+  useEffect(() => {
+    if (!allWorkers.length) return;
+    let filtered = allWorkers;
+    if (activeFilter !== "all") {
+      filtered = filtered.filter((w) =>
+        w.skills?.some((s) => s.toLowerCase() === activeFilter.toLowerCase())
+      );
+    }
+    if (debouncedArea.trim()) {
+      filtered = filtered.filter((w) =>
+        w.area?.toLowerCase().includes(debouncedArea.trim().toLowerCase())
+      );
+    }
+    setWorkers(filtered);
+  }, [allWorkers, activeFilter, debouncedArea]);
 
   const fetchWorkers = async () => {
     setLoading(true);
     try {
+      // ✅ Always fetch ALL nearby workers, filter client-side
       const params = new URLSearchParams({
         lat: userCoords.lat,
         lng: userCoords.lng,
       });
-      if (debouncedArea.trim()) params.append("area", debouncedArea.trim());
-      if (activeFilter !== "all") params.append("skill", activeFilter);
 
       const res = await API.get(`/workers/nearby?${params.toString()}`);
-      setWorkers(res.data);
+      setAllWorkers(res.data);   // store full list
+      setWorkers(res.data);      // display full list initially
     } catch (err) {
       console.error(err);
       showToast("Could not load workers", "error");
@@ -112,10 +154,8 @@ const HomePage = () => {
     }
   };
 
-  const bookWorker = async (worker) => {
-    const userId = localStorage.getItem("userId") || "guest-" + Date.now();
-    localStorage.setItem("userId", userId);
-
+  const bookWorker = async (e, worker) => {
+    e.stopPropagation(); // don't navigate to profile
     setBookingId(worker._id);
     try {
       const serviceType =
@@ -131,6 +171,8 @@ const HomePage = () => {
       setBookingId(null);
     }
   };
+
+  const displayedWorkers = workers;
 
   return (
     <div className="home-page">
@@ -148,34 +190,9 @@ const HomePage = () => {
 
       {/* Accepted booking banners */}
       {acceptedBookings.map((b) => (
-        <div key={b.bookingId} style={{
-          background: "var(--success)",
-          color: "white",
-          padding: "12px 20px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "12px",
-          flexWrap: "wrap",
-        }}>
-          <span style={{ fontSize: "14px", fontWeight: 500 }}>
-            🟢 <strong>{b.workerName}</strong> accepted your booking!
-          </span>
-          <button
-            onClick={() => navigate(`/track/${b.bookingId}`)}
-            style={{
-              background: "white",
-              color: "var(--success)",
-              border: "none",
-              borderRadius: "6px",
-              padding: "7px 16px",
-              fontWeight: 700,
-              fontSize: "13px",
-              cursor: "pointer",
-            }}
-          >
-            📍 Track Live
-          </button>
+        <div key={b.bookingId} className="accepted-banner">
+          <span>🟢 <strong>{b.workerName}</strong> accepted your booking!</span>
+          <button onClick={() => navigate(`/track/${b.bookingId}`)}>📍 Track Live</button>
         </div>
       ))}
 
@@ -206,9 +223,7 @@ const HomePage = () => {
             />
           </div>
           {areaSearch && (
-            <button className="btn btn--ghost btn--sm" onClick={() => setAreaSearch("")}>
-              Clear
-            </button>
+            <button className="btn btn--ghost btn--sm" onClick={() => setAreaSearch("")}>Clear</button>
           )}
         </div>
       </div>
@@ -234,23 +249,21 @@ const HomePage = () => {
           <h2 className="section-title">
             {areaSearch ? `Workers in "${areaSearch}"` : "Available Near You"}
           </h2>
-          {!loading && (
-            <span className="section-count">{workers.length} found</span>
-          )}
+          {!loading && <span className="section-count">{displayedWorkers.length} found</span>}
         </div>
 
         {loading ? (
           <div className="workers-grid">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="skeleton-card">
-                <div className="skeleton" style={{ width: "48px", height: "48px", borderRadius: "14px", marginBottom: "12px" }} />
+                <div className="skeleton" style={{ width: "56px", height: "56px", borderRadius: "50%", marginBottom: "12px" }} />
                 <div className="skeleton" style={{ width: "60%", height: "16px", marginBottom: "8px" }} />
                 <div className="skeleton" style={{ width: "40%", height: "13px", marginBottom: "16px" }} />
                 <div className="skeleton" style={{ width: "100%", height: "36px" }} />
               </div>
             ))}
           </div>
-        ) : workers.length === 0 ? (
+        ) : displayedWorkers.length === 0 ? (
           <div className="empty-state">
             <span className="empty-state__icon">🔍</span>
             <p className="empty-state__text">
@@ -259,19 +272,31 @@ const HomePage = () => {
           </div>
         ) : (
           <div className="workers-grid">
-            {workers.map((w) => {
+            {displayedWorkers.map((w) => {
               const displaySkill =
                 w.skills?.[0] === "other" && w.customSkill ? w.customSkill : w.skills?.[0];
+              const [bgColor, textColor] = getAvatarColors(w.name);
+
               return (
-                <div className="worker-card" key={w._id}>
+                <div
+                  className="worker-card"
+                  key={w._id}
+                  onClick={() => navigate(`/worker/${w._id}`)}
+                  style={{ cursor: "pointer" }}
+                >
+                  {/* DP Avatar */}
                   <div className="worker-card__top">
-                    <div className="worker-avatar">{getInitials(w.name)}</div>
+                    <div
+                      className="worker-avatar worker-avatar--lg"
+                      style={{ background: bgColor, color: textColor }}
+                    >
+                      {getInitials(w.name)}
+                    </div>
                     <div className="worker-availability">Available</div>
                   </div>
 
                   <div className="worker-name">{w.name}</div>
 
-                  {/* Always render area row — placeholder keeps card height equal */}
                   {w.area
                     ? <div className="worker-area">📍 {w.area}</div>
                     : <div className="worker-area-placeholder" />
@@ -284,7 +309,6 @@ const HomePage = () => {
                   </div>
 
                   <div className="worker-meta">
-                    {/* Always show exact km — no "Nearby" fallback */}
                     <span className="worker-distance">
                       📍 {(w.distance / 1000).toFixed(1)} km away
                     </span>
@@ -293,27 +317,12 @@ const HomePage = () => {
                     )}
                   </div>
 
-                  <div className="worker-actions">
-                    {/* Call button */}
-                    <a
-                      className="contact-btn"
-                      href={`tel:${w.phone}`}
-                      title={`Call ${w.name}`}
-                    >
-                      📞
-                    </a>
-                    {/* Email button */}
-                    <a
-                      className="contact-btn"
-                      href={`mailto:${w.email}`}
-                      title={`Email ${w.name}`}
-                    >
-                      ✉️
-                    </a>
-                    {/* Book button */}
+                  <div className="worker-actions" onClick={(e) => e.stopPropagation()}>
+                    <a className="contact-btn" href={`tel:${w.phone}`} title={`Call ${w.name}`}>📞</a>
+                    <a className="contact-btn" href={`mailto:${w.email}`} title={`Email ${w.name}`}>✉️</a>
                     <button
                       className="book-btn"
-                      onClick={() => bookWorker(w)}
+                      onClick={(e) => bookWorker(e, w)}
                       disabled={bookingId === w._id}
                     >
                       {bookingId === w._id

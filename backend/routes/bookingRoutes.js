@@ -22,7 +22,6 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: "Worker is currently unavailable" });
     }
 
-    // Block duplicate active bookings
     const existing = await Booking.findOne({
       userId,
       workerId,
@@ -32,12 +31,7 @@ router.post("/", async (req, res) => {
       return res.status(409).json({ message: "You already have an active booking with this worker" });
     }
 
-    const booking = await Booking.create({
-      workerId,
-      userId,
-      serviceType,
-      status: "pending",
-    });
+    const booking = await Booking.create({ workerId, userId, serviceType, status: "pending" });
 
     try {
       const io = getIO();
@@ -49,6 +43,53 @@ router.post("/", async (req, res) => {
     res.status(201).json(booking);
   } catch (error) {
     console.error("❌ Booking Error:", error.message);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ✅ SUBMIT REVIEW — after completed/paid booking
+router.post("/:id/review", async (req, res) => {
+  try {
+    const { userId, rating, comment } = req.body;
+
+    if (!userId || !rating) {
+      return res.status(400).json({ message: "userId and rating are required" });
+    }
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    if (!["completed", "paid"].includes(booking.status)) {
+      return res.status(400).json({ message: "Can only review completed bookings" });
+    }
+    if (booking.userId !== userId) {
+      return res.status(403).json({ message: "Not your booking" });
+    }
+    if (booking.reviewed) {
+      return res.status(409).json({ message: "Already reviewed this booking" });
+    }
+
+    const worker = await Worker.findById(booking.workerId);
+    if (!worker) return res.status(404).json({ message: "Worker not found" });
+
+    // Add review to worker
+    worker.reviews.push({ userId, bookingId: booking._id, rating, comment: comment || "" });
+
+    // Recalculate average rating
+    const total = worker.reviews.reduce((sum, r) => sum + r.rating, 0);
+    worker.rating = parseFloat((total / worker.reviews.length).toFixed(1));
+    await worker.save();
+
+    // Mark booking as reviewed
+    booking.reviewed = true;
+    await booking.save();
+
+    res.status(201).json({ message: "Review submitted!", rating: worker.rating });
+  } catch (error) {
+    console.error("❌ Review Error:", error.message);
     res.status(500).json({ message: error.message });
   }
 });
@@ -76,7 +117,19 @@ router.get("/worker/:workerId", protect, async (req, res) => {
   }
 });
 
-// ✅ GET SINGLE BOOKING (for payment page)
+// ✅ GET BOOKINGS FOR A SPECIFIC USER (to check if review is possible) — no auth needed
+router.get("/user/:userId", async (req, res) => {
+  try {
+    const bookings = await Booking.find({ userId: req.params.userId })
+      .populate("workerId", "name skills area rating")
+      .sort({ createdAt: -1 });
+    res.json(bookings);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ✅ GET SINGLE BOOKING
 router.get("/:id", protect, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
@@ -88,7 +141,7 @@ router.get("/:id", protect, async (req, res) => {
   }
 });
 
-// ✅ UPDATE BOOKING STATUS (accept / complete / paid)
+// ✅ UPDATE BOOKING STATUS
 router.put("/:id", protect, async (req, res) => {
   try {
     const { status, paymentMethod } = req.body;
@@ -110,7 +163,6 @@ router.put("/:id", protect, async (req, res) => {
       worker.availability = false;
       await worker.save();
 
-      // Notify the user's socket room that their booking was accepted
       try {
         const io = getIO();
         io.to(`user-${booking.userId}`).emit("booking-accepted", {

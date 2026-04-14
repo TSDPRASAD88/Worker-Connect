@@ -6,6 +6,7 @@ import RegisterPage from "./pages/RegisterPage";
 import PaymentPage from "./pages/PaymentPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import TrackingPage from "./pages/TrackingPage";
+import WorkerProfilePage from "./pages/WorkerProfilePage";
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
       <Routes>
         <Route path="/"                    element={<HomePage />} />
         <Route path="/worker"              element={<WorkerDashboard />} />
+        <Route path="/worker/:workerId"    element={<WorkerProfilePage />} />
         <Route path="/login"               element={<LoginPage />} />
         <Route path="/register"            element={<RegisterPage />} />
         <Route path="/payment/:bookingId"  element={<PaymentPage />} />
