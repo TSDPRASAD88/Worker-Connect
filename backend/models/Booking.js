@@ -2,19 +2,13 @@ import mongoose from "mongoose";
 
 const bookingSchema = new mongoose.Schema(
   {
-    userId: {
-      type: String, // will upgrade to ObjectId when user auth is added
-      required: true,
-    },
+    userId: { type: String, required: true },
     workerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Worker",
       required: true,
     },
-    serviceType: {
-      type: String,
-      required: true,
-    },
+    serviceType: { type: String, required: true },
     status: {
       type: String,
       enum: ["pending", "accepted", "completed", "paid"],
@@ -25,6 +19,7 @@ const bookingSchema = new mongoose.Schema(
       enum: ["upi", "cash", ""],
       default: "",
     },
+    reviewed: { type: Boolean, default: false }, // prevents double reviews
   },
   { timestamps: true }
 );
